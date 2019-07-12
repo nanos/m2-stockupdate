@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
+	<group id="index">
+		<job instance="MSThomasXYZ\StockUpdate\Cron\Update" method="execute" name="MSThomasXYZ_StockUpdate_Cron">
+			<schedule>* * * * *</schedule>
+		</job>
+	</group>
+</config>
