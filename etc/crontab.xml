@@ -2,7 +2,7 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
 	<group id="stockupdate">
 		<job instance="MSThomasXYZ\StockUpdate\Cron\Update" method="execute" name="MSThomasXYZ_StockUpdate_Cron">
-			<schedule>* * * * *</schedule>
+			<schedule>*/10 * * * *</schedule>
 		</job>
 	</group>
 </config>
