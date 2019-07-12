@@ -10,6 +10,10 @@ class Update
 	private $_stockIndexer;
 	private $_cacheManager;
 
+	private const DIRECTORY = BP . '/var/import/';
+	private const STOCKFILE = 'stock.csv';
+	private const CSV_DELIMITER = '|';
+
 	public function __construct(
 		\Magento\CatalogInventory\Api\StockRegistryInterface $stockRegistry,
 		\Psr\Log\LoggerInterface $logger,
@@ -23,7 +27,7 @@ class Update
 		$this->_logger = $logger;
 		$this->_stockIndexer = $stockIndexer;
 		$this->_cacheManager = $cacheManager;
-		$this->_csv->setDelimiter('|');
+		$this->_csv->setDelimiter(self::CSV_DELIMITER);
     }
 	
 	/**
@@ -37,7 +41,7 @@ class Update
 		
 		// try to load the file - fail if empty or non existent
 		try {
-			$csvData = $this->loadCSV('stock.csv');
+			$csvData = $this->loadCSV( self::STOCKFILE );
 		} catch (\Throwable $th) {
 			$this->_logger->error(  __METHOD__ . ' ' . $th->getMessage() );
 			return $this;
@@ -115,16 +119,16 @@ class Update
 	private function loadCSV(string $fileName)
 	{
 		// check file is there
-		if( !file_exists( BP . '/var/import/' .$fileName ) ) {
-			throw new \Magento\Framework\Exception\LocalizedException(__('File var/import/'.$fileName.' doesn\'t exist.'));
+		if( !file_exists( self::DIRECTORY .$fileName ) ) {
+			throw new \Magento\Framework\Exception\LocalizedException(__('File '.self::DIRECTORY.$fileName.' doesn\'t exist.'));
 		}
 
 		// and not empty
-		if( !filesize( BP . '/var/import/' .$fileName ) ) {
-			throw new \Magento\Framework\Exception\LocalizedException(__('File var/import/'.$fileName.' is empty.'));
+		if( !filesize( self::DIRECTORY .$fileName ) ) {
+			throw new \Magento\Framework\Exception\LocalizedException(__('File '.self::DIRECTORY.$fileName.' is empty.'));
 		}
 
-		return $this->_csv->getData(BP . '/var/import/' .$fileName);
+		return $this->_csv->getData(self::DIRECTORY .$fileName);
 	}
 
 	/**
