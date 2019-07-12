@@ -32,12 +32,10 @@ class Update
 	public function execute()
 	{
 
-		$this->_logger->info(__METHOD__);
-
 		// keep track of any products we update: We only want to reindex where needed
 		$updatedProducts = [];
 		
-		// try to load the file - fail if empty
+		// try to load the file - fail if empty or non existent
 		try {
 			$csvData = $this->loadCSV('stock.csv');
 		} catch (\Throwable $th) {
@@ -49,29 +47,27 @@ class Update
 			try {
 				$this->_logger->info( __METHOD__ . ' Checking SKU: ' . $data[0]);
 
-				// check we have a numeric quantity
-				if( !is_numeric($data[1]) && $data[1] >= 0 ) {
+				// Some basic syntax check:
+				// a) Need two columns
+				if( count($data) !== 2 ) {
+					throw new \Magento\Framework\Exception\LocalizedException(__('Invalid format on line '. $row.': Has '. count($data). ' column(s).'));
+				}
+
+				// b) qty needs to be numeric
+				if( !(is_numeric($data[1]) && $data[1] >= 0) ) {
 					throw new \Magento\Framework\Exception\LocalizedException(__('Quantity is invalid for product with SKU '.$data[0].'. Current value: '.$data[1].'.'));
 				}
 
-				// update stock
-				$productId = $this->updateStock( $data[0], $data[1], $updatedProducts );
+				// update stock if needed
+				$this->updateStock( $data[0], $data[1], $updatedProducts );
 
 			} catch (\Throwable $th) {
 				$this->_logger->warning( __METHOD__ . ' Error updating SKU ' .$data[0].': ' . $th->getMessage());
 			}
 		}
 
-		// if we have updated anything: reindex and clean cache
-		if( count($updatedProducts) ) {
-			$this->_stockIndexer->execute($updatedProducts);
-			$this->_cacheManager->clean(\Zend_Cache::CLEANING_MODE_ALL, array('FPC'));
-			$this->_logger->info( __METHOD__ . ' Index and cache updated');
-		} else {
-			$this->_logger->info( __METHOD__ . ' no stock updated');
-		}
+		$this->updateIndexAndCache( $updatedProducts );
 		
-		$this->_logger->info(__METHOD__ . ' done');
 		return $this;
 
 	}
@@ -90,17 +86,19 @@ class Update
 		
 		//check if update needed
 		if( $stock->getQty() != $qty ) {
-			// check that we are not providing a float for qty, unless decimal quantities are allowed
+			// check that we are not providing a decimal value for qty, unless decimal quantities are allowed
 			if( !$stock->getIsQtyDecimal() && (int)$qty != $qty ) {
 				throw new \Magento\Framework\Exception\LocalizedException(__('Decimal quantity not allowed for product with SKU '.$sku.' Current value: '.$qty.'.'));
 			}
+
+			// update qty and in stock indicator
 			$stock->setQty($qty);
 			$stock->setIsInStock( $qty > $stock->getMinQty() );
 			$this->_stockRegistry->updateStockItemBySku($sku, $stock);
 
-			// keep track of product id
+			// keep track of updated product ids
 			array_push($updatedProducts, $stock->getProductId());
-			$this->_logger->info( __METHOD__ . ' Stock updated ('.$stock->getProductId().'). New value: '.$qty);
+			$this->_logger->info( __METHOD__ . ' Stock updated. New value: '.$qty);
 			return true;
 		} else {
 			$this->_logger->info( __METHOD__ . ' Stock unchanged');
@@ -127,5 +125,20 @@ class Update
 		}
 
 		return $this->_csv->getData(BP . '/var/import/' .$fileName);
+	}
+
+	/**
+	 * Update the stock index and full page cache if needed
+	 * @param array $updatedProducts A list of updated products, so that we can reindex only where needed
+	 */
+	private function updateIndexAndCache( array $updatedProducts ) {
+		// if we have updated anything: reindex and clean cache
+		if( count($updatedProducts) ) {
+			$this->_stockIndexer->execute($updatedProducts);
+			$this->_cacheManager->clean(\Zend_Cache::CLEANING_MODE_ALL, array('FPC'));
+			$this->_logger->info( __METHOD__ . ' Index and cache updated');
+		} else {
+			$this->_logger->info( __METHOD__ . ' no stock updated');
+		}
 	}
 }
