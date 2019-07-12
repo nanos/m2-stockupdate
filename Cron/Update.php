@@ -4,22 +4,22 @@ namespace MSThomasXYZ\StockUpdate\Cron;
 
 class Update
 {
-	
 	private $_stockRegistry;
 	private $_csv;
 	private $_logger;
+	private $_stockIndexer;
 
     public function __construct(
-		
 		\Magento\CatalogInventory\Api\StockRegistryInterface $stockRegistry,
 		\Psr\Log\LoggerInterface $logger,
-    	\Magento\Framework\File\Csv $csv
+		\Magento\Framework\File\Csv $csv,
+		\Magento\CatalogInventory\Model\Indexer\Stock $stockIndexer
 	)
 	{
-		
 		$this->_stockRegistry = $stockRegistry;
 		$this->_csv = $csv;
 		$this->_logger = $logger;
+		$this->_stockIndexer = $stockIndexer;
 		$this->_csv->setDelimiter('|');
     }
     
@@ -27,6 +27,8 @@ class Update
 	{
 
 		$this->_logger->info(__METHOD__);
+
+		$updatedProducts = [];
 		
 		try {
 			$csvData = $this->loadCSV('stock.csv');
@@ -39,14 +41,23 @@ class Update
 			try {
 				$this->_logger->info( __METHOD__ . ' Checking SKU: ' . $data[0]);
 
-
 				$productId = $this->updateStock( $data[0], $data[1] );
 				
-				
+				if( $productId != '' ) {
+					array_push($updatedProducts, $productId);
+				}
 
 			} catch (\Throwable $th) {
-				$this->_logger->warn( __METHOD__ . ' Error updating SKU ' .$data[0].': ' . $th->getMessage());
+				$this->_logger->warning( __METHOD__ . ' Error updating SKU ' .$data[0].': ' . $th->getMessage());
 			}
+		}
+
+		if( count($updatedProducts) ) {
+			$this->_logger->info( __METHOD__ . ' stock updated');
+			$this->_stockIndexer->execute($updatedProducts);
+			$this->_logger->info( __METHOD__ . ' Indexer updated');
+		} else {
+			$this->_logger->info( __METHOD__ . ' no stock updated');
 		}
 		
 		$this->_logger->info(__METHOD__ . ' done');
@@ -71,10 +82,12 @@ class Update
 
 	private function loadCSV(String $fileName)
 	{
+		// check file is there
 		if( !file_exists( BP . '/var/import/' .$fileName ) ) {
 			throw new \Magento\Framework\Exception\LocalizedException(__('File var/import/'.$fileName.' doesn\'t exist.'));
 		}
 
+		// and not empty
 		if( !filesize( BP . '/var/import/' .$fileName ) ) {
 			throw new \Magento\Framework\Exception\LocalizedException(__('File var/import/'.$fileName.' is empty.'));
 		}
