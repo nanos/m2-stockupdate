@@ -4,19 +4,19 @@ namespace MSThomasXYZ\StockUpdate\Cron;
 
 class Update
 {
-	private $_productRepository;
+	
 	private $_stockRegistry;
 	private $_csv;
 	private $_logger;
 
     public function __construct(
-		\Magento\Catalog\Api\ProductRepositoryInterface $productRepository,
+		
 		\Magento\CatalogInventory\Api\StockRegistryInterface $stockRegistry,
 		\Psr\Log\LoggerInterface $logger,
     	\Magento\Framework\File\Csv $csv
 	)
 	{
-		$this->_productRepository = $productRepository;
+		
 		$this->_stockRegistry = $stockRegistry;
 		$this->_csv = $csv;
 		$this->_logger = $logger;
@@ -38,13 +38,11 @@ class Update
 		foreach ($csvData as $row => $data) {
 			try {
 				$this->_logger->info( __METHOD__ . ' Checking SKU: ' . $data[0]);
-				$product = $this->getProductBySku($data[0]);
-				
-				$this->_logger->info( __METHOD__ . ' Product: ' . $product->getName());
-				
-				$this->updateStock($product, $data[1]);
 
-				$this->_logger->info( __METHOD__ . ' stock updated');
+
+				$productId = $this->updateStock( $data[0], $data[1] );
+				
+				
 
 			} catch (\Throwable $th) {
 				$this->_logger->warn( __METHOD__ . ' Error updating SKU ' .$data[0].': ' . $th->getMessage());
@@ -56,18 +54,21 @@ class Update
 
 	}
 
-    private function getProductBySku($sku)
-	{
-		return $this->_productRepository->get($sku);
+    private function updateStock( $sku, $qty ) {
+		$stock = $this->_stockRegistry->getStockItemBySku($sku);
+		
+		if( $stock->getQty() != $qty ) {
+			$stock->setQty($qty);
+			$stock->setIsInStock($qty>0);
+			$this->_stockRegistry->updateStockItemBySku($sku, $stock);
+			$this->_logger->info( __METHOD__ . ' Stock updated ('.$stock->getProductId().'). New value: '.$qty);
+			return $stock->getProductId();
+		} else {
+			$this->_logger->info( __METHOD__ . ' Stock unchanged');
+			return '';
+		}
 	}
 
-	private function updateStock( $product, $qty ) {
-		$stockItem = $this->_stockRegistry->getStockItem($product->getId());
-		$stockItem->setData('qty', $qty);
-		$stockItem->setData('is_in_stock', ($qty > 0 ) ? 1 : 0);
-		$stockItem->save();
-	}
-	
 	private function loadCSV(String $fileName)
 	{
 		if( !file_exists( BP . '/var/import/' .$fileName ) ) {
