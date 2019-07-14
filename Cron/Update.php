@@ -9,6 +9,8 @@ class Update
 	private $_logger;
 	private $_stockIndexer;
 	private $_cacheManager;
+	private $_modelFactory;
+	private $_currentlyRunning;
 
 	private const DIRECTORY = BP . '/var/import/';
 	private const STOCKFILE = 'stock.csv';
@@ -19,13 +21,15 @@ class Update
 		\Psr\Log\LoggerInterface $logger,
 		\Magento\Framework\File\Csv $csv,
 		\Magento\CatalogInventory\Model\Indexer\Stock $stockIndexer,
-		\Magento\PageCache\Model\Cache\Type $cacheManager
+		\Magento\PageCache\Model\Cache\Type $cacheManager,
+		\MSThomasXYZ\StockUpdate\Model\DataFactory $modelFactory
 	)
 	{
 		$this->_stockRegistry = $stockRegistry;
 		$this->_csv = $csv;
 		$this->_logger = $logger;
 		$this->_stockIndexer = $stockIndexer;
+		$this->_modelFactory = $modelFactory;
 		$this->_cacheManager = $cacheManager;
 		$this->_csv->setDelimiter(self::CSV_DELIMITER);
     }
@@ -35,6 +39,12 @@ class Update
 	 */
 	public function execute()
 	{
+		if( $this->isStockUpdateRunning() ) {
+			$this->_logger->error(  __METHOD__ . ' An update is currently running. Please try again later.');
+			return $this;
+		}
+		
+		$this->markStockUpdateRunning();
 
 		// keep track of any products we update: We only want to reindex where needed
 		$updatedProducts = [];
@@ -44,7 +54,7 @@ class Update
 			$csvData = $this->loadCSV( self::STOCKFILE );
 		} catch (\Throwable $th) {
 			$this->_logger->error(  __METHOD__ . ' ' . $th->getMessage() );
-			return $this;
+			return $this->markStockUpdateEnded();
 		}
 
 		foreach ($csvData as $row => $data) {
@@ -72,7 +82,7 @@ class Update
 
 		$this->updateIndexAndCache( $updatedProducts );
 		
-		return $this;
+		return $this->markStockUpdateEnded();
 
 	}
 
@@ -144,5 +154,40 @@ class Update
 		} else {
 			$this->_logger->info( __METHOD__ . ' no stock updated');
 		}
+	}
+
+	/**
+	 * Check if a version of this script is already running
+	 * @return bool
+	 */
+	private function isStockUpdateRunning() 
+	{
+		$collection = $this->_modelFactory->create();
+		$collection = $collection->getCollection();
+		$collection->addFieldToFilter('end_time', array('null'=>true));
+		return $collection->getSize() !== 0;
+	}
+
+	/**	
+	 * Create a new row in the database to indicate we are currently running
+	 */
+	private function markStockUpdateRunning() 
+	{
+		$this->_currentlyRunning = $this->_modelFactory->create();
+		$this->_currentlyRunning->setData(array(
+			'start_time' => new \Zend_Db_Expr('NOW()')
+		))
+		->save();
+	}
+
+	/**
+	 * When we are done running - whether with error or successfully - update the database entry
+	 * to indicate the run is finished
+	 */
+	private function markStockUpdateEnded() {
+
+		$this->_currentlyRunning->setEndTime( new \Zend_Db_Expr('NOW()') )->save();
+
+		return $this;
 	}
 }

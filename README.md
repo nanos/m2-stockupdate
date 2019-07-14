@@ -9,11 +9,12 @@ Install the module, then place a file called `stock.csv` into the `var/import/` 
 The module will
 
 1. Check the file exists 
-2. Prevent empty files being processed
-3. Process file and update new stock values
-4. Ensure In Stock & Out Of Stock settings are triggered 
-5. Manage indexes & cache
-6. Provide detailed logging
+2. If there is a file already been processed wait until this is finished & successful
+3. Prevent empty files being processed
+4. Process file and update new stock values
+5. Ensure In Stock & Out Of Stock settings are triggered 
+6. Manage indexes & cache
+7. Provide detailed logging
 
 ## CSV file format
 
@@ -28,7 +29,10 @@ sku2 | 0
 
 ## Limitations
 
- - The check if a file is already being processed and wait until this is finished and successful currently depends on the cron scheduler which prevents two cron jobs with the same name from running concurrently.
+ - To ensure we are not running the update while another process is running we are storing the start and end date/time of each run in the database. This is clunky because
+    1) It can easily create problems, e.g. when an error gets thrown, or another un-anticipated edge case ocurs, and we aren't updating the `end_time` column.
+    2) The table will fill up really quickly. You'll want to ensure that it get's cleaned out regularly.
+    3) We should be able to rely on Magento's built in cron mechanism which should ensure that no two instances of the same cron job can run concurrently. (Although that can also suffer of the first problem.)
  - The way in which we clean the full page cache after updating cache seems really inelegant. Surely there must be a better way?!
  - No checks are made to ensure that `stock.csv` is "new". Before using this, you'll definitely want to make sure that you check the modified timestamp of the file against a record of the last run and proceed only if newer.
  - All parameters (filenames, folders, schedule) are hard coded.
