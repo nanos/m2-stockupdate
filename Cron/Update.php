@@ -21,7 +21,7 @@ class Update
 		\Psr\Log\LoggerInterface $logger,
 		\Magento\Framework\File\Csv $csv,
 		\Magento\CatalogInventory\Model\Indexer\Stock $stockIndexer,
-		\Magento\PageCache\Model\Cache\Type $cacheManager,
+		\Magento\Framework\App\Cache\Manager $cacheManager,
 		\MSThomasXYZ\StockUpdate\Model\DataFactory $modelFactory
 	)
 	{
@@ -149,7 +149,8 @@ class Update
 		// if we have updated anything: reindex and clean cache
 		if( count($updatedProducts) ) {
 			$this->_stockIndexer->execute($updatedProducts);
-			$this->_cacheManager->clean(\Zend_Cache::CLEANING_MODE_ALL, array('FPC'));
+			$this->_cacheManager->clean($this->_cacheManager->getAvailableTypes());
+
 			$this->_logger->info( __METHOD__ . ' Index and cache updated');
 		} else {
 			$this->_logger->info( __METHOD__ . ' no stock updated');

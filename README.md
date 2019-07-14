@@ -33,7 +33,6 @@ sku2 | 0
     1) It can easily create problems, e.g. when an error gets thrown, or another un-anticipated edge case ocurs, and we aren't updating the `end_time` column.
     2) The table will fill up really quickly. You'll want to ensure that it get's cleaned out regularly.
     3) We should be able to rely on Magento's built in cron mechanism which should ensure that no two instances of the same cron job can run concurrently. (Although that can also suffer of the first problem.)
- - The way in which we clean the full page cache after updating cache seems really inelegant. Surely there must be a better way?!
  - No checks are made to ensure that `stock.csv` is "new". Before using this, you'll definitely want to make sure that you check the modified timestamp of the file against a record of the last run and proceed only if newer.
  - All parameters (filenames, folders, schedule) are hard coded.
  - Rows that don't contain exactly two parameters, as well as rows that contain invalid SKU or quantity will be skipped.
