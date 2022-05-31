@@ -2,6 +2,8 @@
 
 A really basic module that will update your product stock from a CSV file every 10 minutes.
 
+This was prepared as part of a coding exercise for a job interview.
+
 ## Usage
 
 Install the module, then place a file called `stock.csv` into the `var/import/` folder.
